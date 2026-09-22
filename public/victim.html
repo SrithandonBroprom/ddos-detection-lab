@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎯 Victim Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<header class="bg-gradient-to-r from-red-700 to-rose-700 text-white shadow-lg">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🎯</span>
+      <div>
+        <h1 class="text-xl font-bold">VICTIM DASHBOARD</h1>
+        <p class="text-xs opacity-80">เซิร์ฟเวอร์เป้าหมาย — <span id="hostname">...</span></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div id="healthBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-green-500">💚 Healthy</div>
+      <div id="statusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-green-500">● ปกติ</div>
+      <div id="connBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-500">⚪ กำลังเชื่อมต่อ</div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-5">
+
+  <!-- Attack Banner -->
+  <div id="attackBanner" class="col-span-12 hidden bg-red-600 text-white p-4 rounded-xl shadow-lg animate-pulse">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🚨</span>
+        <div>
+          <div class="font-bold text-lg">กำลังถูกโจมตี DDoS!</div>
+          <div class="text-sm opacity-90" id="attackInfo">—</div>
+        </div>
+      </div>
+      <button id="btnQuickBlock" class="bg-white text-red-700 px-4 py-2 rounded-lg font-bold hover:bg-red-50">
+        ⚡ Block ทันที
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <section class="col-span-12 grid grid-cols-2 md:grid-cols-6 gap-4">
+    <div class="bg-white rounded-xl shadow p-4 border">
+      <div class="text-xs text-gray-500">Total Requests</div>
+      <div id="statTotal" class="text-2xl font-bold text-blue-700">0</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border">
+      <div class="text-xs text-gray-500">Requests/วินาที</div>
+      <div id="statRps" class="text-2xl font-bold text-indigo-700">0</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border">
+      <div class="text-xs text-gray-500">น่าสงสัย</div>
+      <div id="statSuspicious" class="text-2xl font-bold text-amber-600">0</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border">
+      <div class="text-xs text-gray-500">ถูกบล็อก</div>
+      <div id="statBlocked" class="text-2xl font-bold text-red-600">0</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border">
+      <div class="text-xs text-gray-500">IP ที่ติดตาม</div>
+      <div id="statTracked" class="text-2xl font-bold text-gray-700">0</div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 border">
+      <div class="text-xs text-gray-500">Response Time</div>
+      <div id="statRT" class="text-2xl font-bold text-purple-700">0ms</div>
+    </div>
+  </section>
+
+  <!-- Control Panel -->
+  <section class="col-span-12 md:col-span-4 bg-white rounded-xl shadow-md p-5">
+    <h2 class="font-bold text-lg mb-4">🛡️ ระบบป้องกัน</h2>
+
+    <label class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
+      <input id="protectionOn" type="checkbox" checked class="w-5 h-5" />
+      <div>
+        <div class="font-semibold text-sm">เปิดระบบป้องกัน</div>
+        <div id="protectionStatus" class="text-xs text-green-600">✅ เปิดใช้งาน</div>
+      </div>
+    </label>
+
+    <div class="mt-4">
+      <div class="text-sm text-gray-600 mb-1">
+        Rate Limit: <span id="cfgMax" class="font-mono font-bold text-blue-700">30</span> req/s
+      </div>
+      <input id="cfgMaxInput" type="range" min="3" max="200" value="30" class="w-full" />
+      <div class="flex justify-between text-xs text-gray-400 mt-1">
+        <span>3 (เข้มงวด)</span>
+        <span>200 (ผ่อนปรน)</span>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <div class="text-sm text-gray-600 mb-1">
+        Block Score: <span id="cfgScore" class="font-mono font-bold text-red-700">50</span>
+      </div>
+      <input id="cfgScoreInput" type="range" min="20" max="100" value="50" class="w-full" />
+    </div>
+
+    <div class="flex gap-2 mt-4">
+      <button id="btnUnblockAll" class="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg font-semibold text-sm hover:bg-amber-600">
+        🔓 ปลดแบนทั้งหมด
+      </button>
+      <button id="btnReset" class="flex-1 px-4 py-2 bg-gray-200 rounded-lg font-semibold text-sm hover:bg-gray-300">
+        🔄 รีเซ็ต
+      </button>
+    </div>
+
+    <!-- History + Discord -->
+    <div class="flex gap-2 mt-3 pt-3 border-t">
+      <a href="/history.html"
+         class="flex-1 text-center px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700">
+        📅 ดูประวัติ
+      </a>
+      <button id="btnTestDiscord"
+              class="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg font-semibold text-sm hover:bg-indigo-600">
+        🔔 ทดสอบ Discord
+      </button>
+    </div>
+
+    <!-- Health Card -->
+    <div id="healthCard" class="mt-4 p-3 rounded-lg border-2 border-green-200 bg-green-50 transition">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span id="healthIcon" class="text-xl">💚</span>
+          <div>
+            <div class="font-semibold text-sm">Health Status</div>
+            <div id="healthStatusText" class="text-xs text-gray-600">healthy</div>
+          </div>
+        </div>
+        <div class="text-right">
+          <div id="healthRT" class="text-sm font-bold text-green-700">0ms</div>
+          <div class="text-xs text-gray-500">Avg RT</div>
+        </div>
+      </div>
+      <div class="mt-2 grid grid-cols-3 gap-1 text-[10px] text-gray-600">
+        <div class="text-center bg-white/50 rounded py-1">
+          <div class="font-bold" id="healthMin">0ms</div>
+          <div>Min</div>
+        </div>
+        <div class="text-center bg-white/50 rounded py-1">
+          <div class="font-bold" id="healthMax">0ms</div>
+          <div>Max</div>
+        </div>
+        <div class="text-center bg-white/50 rounded py-1">
+          <div class="font-bold" id="healthChecks">0</div>
+          <div>Checks</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endpoints info -->
+    <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
+      <div class="font-semibold mb-1">📌 Endpoints ที่เปิดให้:</div>
+      <ul class="space-y-1 font-mono">
+        <li>• /api/data</li>
+        <li>• /api/heavy</li>
+        <li>• /api/login</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Chart Section -->
+  <section class="col-span-12 md:col-span-8 space-y-5">
+    <div class="bg-white rounded-xl shadow-md p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="font-bold text-lg">📊 Traffic Real-time</h2>
+          <p id="chartSubtitle" class="text-xs text-gray-500">ความเร็วปัจจุบัน (req/s)</p>
+        </div>
+        <div class="text-xs text-gray-500 flex items-center gap-3">
+          <span><span class="inline-block w-3 h-3 bg-blue-500 rounded"></span> ปกติ</span>
+          <span><span class="inline-block w-3 h-3 bg-amber-500 rounded"></span> น่าสงสัย</span>
+          <span><span class="inline-block w-3 h-3 bg-red-500 rounded"></span> ถูกบล็อก</span>
+        </div>
+      </div>
+      <div class="h-72">
+        <canvas id="trafficChart"></canvas>
+      </div>
+      <div class="mt-2 text-xs text-gray-500 text-right">
+        Peak: <span id="chartPeak" class="font-bold text-red-600">0</span>
+        <span id="chartPeakUnit">req/s</span>
+        | Current: <span id="chartCurrent" class="font-bold text-blue-600">0</span>
+        <span id="chartCurrentUnit">req/s</span>
+      </div>
+    </div>
+
+    <!-- Chart Mode Selector -->
+    <div class="bg-white rounded-xl shadow-md p-4">
+      <div class="flex items-center gap-4 text-sm">
+        <span class="font-semibold text-gray-700">📈 โหมดกราฟ:</span>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="chartMode" value="rps" checked />
+          <span>req/s (ความเร็วปัจจุบัน)</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="chartMode" value="total" />
+          <span>Total Requests (สะสม)</span>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- Blocked IPs -->
+  <section class="col-span-12 md:col-span-6 bg-white rounded-xl shadow-md p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-bold text-lg">🚫 IP ที่ถูกบล็อก</h2>
+      <span id="blockedCount" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-bold">0</span>
+    </div>
+    <div class="max-h-80 overflow-y-auto">
+      <table class="w-full text-sm">
+        <thead class="text-gray-500 text-xs uppercase sticky top-0 bg-white">
+          <tr>
+            <th class="text-left py-2">IP (ผู้โจมตี)</th>
+            <th class="text-left">เหตุผล</th>
+            <th class="text-right">score</th>
+            <th class="text-right">เหลือ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="blockedTable"></tbody>
+      </table>
+      <div id="blockedEmpty" class="text-center text-gray-400 py-6 text-sm">ยังไม่มี IP ถูกบล็อก</div>
+    </div>
+  </section>
+
+  <!-- Live Traffic -->
+  <section class="col-span-12 md:col-span-6 bg-white rounded-xl shadow-md p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-bold text-lg">📡 IP ที่กำลังติดตาม</h2>
+      <span id="trackedCount" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">0</span>
+    </div>
+    <div class="max-h-80 overflow-y-auto">
+      <table class="w-full text-sm">
+        <thead class="text-gray-500 text-xs uppercase sticky top-0 bg-white">
+          <tr>
+            <th class="text-left py-2">IP</th>
+            <th class="text-right">req/s</th>
+            <th class="text-right">total</th>
+            <th class="text-right">score</th>
+            <th class="text-center">สถานะ</th>
+          </tr>
+        </thead>
+        <tbody id="trafficTable"></tbody>
+      </table>
+      <div id="trafficEmpty" class="text-center text-gray-400 py-6 text-sm">ยังไม่มี traffic</div>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section class="col-span-12 bg-white rounded-xl shadow-md p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-bold text-lg">📜 Log การตรวจจับ</h2>
+      <button id="btnClearLog" class="text-xs text-gray-500 hover:text-gray-700">ล้าง log</button>
+    </div>
+    <div id="logBox" class="max-h-72 overflow-y-auto text-xs font-mono space-y-1 bg-gray-900 text-green-300 p-3 rounded-lg">
+      <div class="text-gray-500">รอเหตุการณ์...</div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="max-w-7xl mx-auto px-6 py-4 text-center text-xs text-gray-500">
+  DDoS Detection & Prevention Lab v5.0 — 🎯 Victim Dashboard
+</footer>
+
+<script src="/victim.js"></script>
+</body>
+</html>

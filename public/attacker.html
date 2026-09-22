@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚔️ Attacker Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+
+<header class="bg-gradient-to-r from-red-800 to-orange-700 shadow-lg">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">⚔️</span>
+      <div>
+        <h1 class="text-xl font-bold">ATTACKER CONSOLE</h1>
+        <p class="text-xs opacity-80">สแกนหาเป้าหมาย → เลือก → โจมตี</p>
+      </div>
+    </div>
+    <div id="connBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-500">⚪ กำลังเชื่อมต่อ</div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-5">
+
+  <!-- Step 1: Scan -->
+  <section class="col-span-12 bg-gray-800 rounded-xl shadow-lg p-5 border border-gray-700">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">1</span>
+      <h2 class="font-bold text-lg">สแกนหาเป้าหมายในวง LAN</h2>
+    </div>
+
+    <div class="flex gap-3 items-end">
+      <div>
+        <label class="text-sm text-gray-400">Port ที่จะสแกน</label>
+        <input id="scanPort" type="number" value="3000" class="mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm w-32" />
+      </div>
+      <button id="btnScan" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold">
+        🔍 เริ่มสแกน
+      </button>
+      <div id="scanStatus" class="text-sm text-gray-400 ml-4"></div>
+    </div>
+
+    <div id="scanProgress" class="hidden mt-4">
+      <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+        <div id="scanBar" class="bg-blue-500 h-2 transition-all" style="width:0%"></div>
+      </div>
+      <div id="scanText" class="text-xs text-gray-400 mt-2">0 / 0 IPs (พบ 0)</div>
+    </div>
+  </section>
+
+  <!-- Step 2: Targets -->
+  <section class="col-span-12 bg-gray-800 rounded-xl shadow-lg p-5 border border-gray-700">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">2</span>
+      <h2 class="font-bold text-lg">เป้าหมายที่พบ</h2>
+      <span id="targetCount" class="ml-2 px-2 py-0.5 bg-gray-700 rounded-full text-xs">0</span>
+    </div>
+
+    <div id="targetsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="col-span-full text-center text-gray-500 py-6 text-sm">
+        ยังไม่พบเป้าหมาย — กดสแกนก่อน
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 3: Attack -->
+  <section class="col-span-12 md:col-span-4 bg-gray-800 rounded-xl shadow-lg p-5 border border-gray-700">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">3</span>
+      <h2 class="font-bold text-lg">โจมตี</h2>
+    </div>
+
+    <div id="selectedTarget" class="p-3 bg-gray-900 rounded-lg mb-4">
+      <div class="text-xs text-gray-500">เป้าหมายที่เลือก:</div>
+      <div id="selectedTargetIP" class="font-mono font-bold text-red-400">— ยังไม่เลือก —</div>
+    </div>
+
+    <div class="space-y-3">
+      <div>
+        <label class="text-sm text-gray-400">Endpoint</label>
+        <select id="attackEndpoint" class="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm">
+          <option value="/api/data">/api/data</option>
+          <option value="/api/heavy">/api/heavy (หนัก CPU)</option>
+          <option value="/api/login">/api/login</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-gray-400">Requests</label>
+          <input id="attackTotal" type="number" value="2000" class="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="text-sm text-gray-400">Concurrency</label>
+          <input id="attackConc" type="number" value="100" class="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm" />
+        </div>
+      </div>
+      <button id="btnAttack" class="w-full px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-bold text-lg" disabled>
+        ⚔️ เริ่มโจมตี
+      </button>
+      <button id="btnStop" class="w-full px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold" disabled>
+        ⏹️ หยุด
+      </button>
+    </div>
+  </section>
+
+  <!-- Live Results -->
+  <section class="col-span-12 md:col-span-8 bg-gray-800 rounded-xl shadow-lg p-5 border border-gray-700">
+    <h2 class="font-bold text-lg mb-4">📊 ผลลัพธ์ Real-time</h2>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div class="bg-gray-900 rounded-lg p-3">
+        <div class="text-xs text-gray-500">ส่งไปแล้ว</div>
+        <div id="resSent" class="text-2xl font-bold text-blue-400">0</div>
+      </div>
+      <div class="bg-gray-900 rounded-lg p-3">
+        <div class="text-xs text-gray-500">สำเร็จ (200)</div>
+        <div id="resOk" class="text-2xl font-bold text-green-400">0</div>
+      </div>
+      <div class="bg-gray-900 rounded-lg p-3">
+        <div class="text-xs text-gray-500">ถูกบล็อก (429)</div>
+        <div id="resBlocked" class="text-2xl font-bold text-red-400">0</div>
+      </div>
+      <div class="bg-gray-900 rounded-lg p-3">
+        <div class="text-xs text-gray-500">req/s</div>
+        <div id="resRps" class="text-2xl font-bold text-amber-400">0</div>
+      </div>
+    </div>
+
+    <div class="bg-gray-900 rounded-lg p-4">
+      <div class="text-xs text-gray-500 mb-2">Log</div>
+      <div id="logBox" class="max-h-64 overflow-y-auto text-xs font-mono space-y-1 text-gray-300">
+        <div class="text-gray-600">รอคำสั่ง...</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="/attacker.js"></script>
+</body>
+</html>

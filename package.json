@@ -1,0 +1,14 @@
+{
+  "name": "ddos-demo-v4",
+  "version": "4.0.0",
+  "description": "DDoS Demo - Attacker & Victim Separation",
+  "scripts": {
+    "victim": "node victim-server.js",
+    "attacker": "node attacker-server.js",
+    "start": "node victim-server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
